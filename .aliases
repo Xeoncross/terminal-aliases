@@ -1,0 +1,173 @@
+
+##
+## Collection of the most useful general functions and alias helpers for Mac and Linux
+##
+
+
+#
+# Part 1: Simple helper aliases
+#
+
+# Always highlight matches
+alias grep='grep --color=always'
+
+# See all the directories (only) in the current folder
+alias lsdir='ls -l | grep "^d"'
+
+# check ssh key information
+alias sshkeyinfo="ssh-keygen -l -f ~/.ssh/id_rsa.pub"
+
+# checkhostports [domain or ip]
+alias checkhostports="nmap -v --script ssl-enum-ciphers -Pn "
+
+#
+# Part 2: Functions
+#
+
+# Vagrant boxes all have different SSH keys
+function vagrant_key_reset() {
+	sed '/\[localhost\]:2222/d' ~/.ssh/known_hosts > ~/.ssh/known_hosts
+}
+
+# Encrypt some data using AES 256 CBC
+function encrypt() {
+	openssl aes-256-cbc -a -e -salt -in "$1" -out "$1.aes"
+}
+
+# Decrypt data encypted using AES 256 CBC
+function decrypt() {
+	# Remove ".aes"
+	THEFILE=${1:0:-4}
+	if [ ! -f $THEFILE ]; then
+		openssl aes-256-cbc -a -d -salt -in "$1" -out "$THEFILE"
+	else
+		echo "$THEFILE already exists"
+	fi
+}
+
+# todo...
+function sync_down() {
+	rsync -a -v -e "ssh -p $1" $2@$3:$4 ./
+}
+function sync_up() {
+	rsync -a -v -e "ssh -p $1" ./ $2@$3:$4
+}
+
+# Google translate <phrase> <source-language> <output-language>
+translate() {
+	wget -qO- "http://ajax.googleapis.com/ajax/services/language/translate?v=1.0&q=$1&langpair=$2|${3:-en}" | sed 's/.*"translatedText":"\([^"]*\)".*}/\1\n/';
+}
+
+# Sometimes you simply want to see the response headers of a request
+function curlheaders() {
+	curl -s -D - $1 -o /dev/null
+}
+
+# todo...
+# --num-calls to issue on each -num-conns
+# alias benchmark='echo "httperf --hog --num-calls 5 --num-conns 100 --server"'
+# alias benchmark='echo "siege -c 1000 -i -b [url]"'
+
+# http://justinlilly.com/dotfiles/zsh.html
+# determine local IP address
+ips () {
+    ifconfig | grep "inet " | awk '{ print $2 }'
+}
+
+# lookup a word (or fragment) in the dictionary
+dict() {
+    grep "$@" /usr/share/dict/words
+}
+
+# create a PNG waveform from a video/audio clip
+waveform() {
+  ffmpeg -y -v warning -i "$1" -filter_complex "showwavespic=s=640x240:split_channels=1" -frames:v 1 "$1.png"
+}
+
+# https://github.com/AlexLombry/Aliases/blob/master/alias.txt
+extract () {
+    if [ -f $1 ] ; then
+      case $1 in
+        *.tar.bz2)   tar xjf $1     ;;
+        *.tar.gz)    tar xzf $1     ;;
+        *.bz2)       bunzip2 $1     ;;
+        *.rar)       unrar e $1     ;;
+        *.gz)        gunzip $1      ;;
+        *.tar)       tar xf $1      ;;
+        *.tbz2)      tar xjf $1     ;;
+        *.tgz)       tar xzf $1     ;;
+        *.zip)       unzip $1       ;;
+        *.Z)         uncompress $1  ;;
+        *.7z)        7z x $1        ;;
+        *)     echo "'$1' cannot be extracted via extract()" ;;
+         esac
+     else
+         echo "'$1' is not a valid file"
+     fi
+}
+
+mcd() {
+  mkdir -p "$1" && cd "$1";
+}
+
+authme() {
+  ssh "$1" 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys' \
+    < ~/.ssh/id_dsa.pub
+}
+
+createtunnel() {
+  if [ $# -eq 3 ]
+  then
+    user=$1
+    host=$2
+    localPort=$3
+    remotePort=$3
+  else
+    if [ $# -eq 4 ]
+    then
+      user=$1
+      host=$2
+      localPort=$3
+      remotePort=$4
+    else
+      echo -n "User: "; read user
+      echo -n "host: "; read host
+      echo -n "Distant host: "; read remotePort
+      echo -n "Local port: "; read localPort
+    fi
+  fi
+  ssh -N -f $user@$host -L ${localPort}:${host}:${remotePort}
+}
+
+# https://github.com/suevalov/macos-terminal-aliases
+
+# Start an HTTP server from a directory, optionally specifying the port
+function server() {
+    local port="${1:-8000}"
+    open "http://localhost:${port}/"
+    # Set the default Content-Type to `text/plain` instead of `application/octet-stream`
+    # And serve everything as UTF-8 (although not technically correct, this doesn’t break anything for binary files)
+    python -c $'import SimpleHTTPServer;\nmap = SimpleHTTPServer.SimpleHTTPRequestHandler.extensions_map;\nmap[""] = "text/plain";\nfor key, value in map.items():\n\tmap[key] = value + ";charset=UTF-8";\nSimpleHTTPServer.test();' "$port"
+}
+
+# Copy w/ progress
+cp_p () {
+  rsync -WavP --human-readable --progress $1 $2
+}
+
+##
+## Mac OS X platform
+##
+if [ "$(uname)" == "Darwin" ]; then
+
+	# Empty trash
+	alias emptytrash='sudo rm -rfv /Volumes/*/.Trashes; rm -rfv ~/.Trash'
+
+	# Hide/show all desktop icons (useful when presenting)
+	alias hidedesktop='defaults write com.apple.finder CreateDesktop -bool false && killall Finder'
+	alias showdesktop='defaults write com.apple.finder CreateDesktop -bool true && killall Finder'
+
+	# Like netstat for linux
+	alias netstat="sudo lsof -n -i4TCP | grep LISTEN"
+
+fi
